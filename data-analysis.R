@@ -4,7 +4,7 @@ Analyzing crowdsourced disaster data
 Kim de Bie
 Leiden University College The Hague
 Created: 10-04-2016
-Last edited: 01-05-2016
+Last edited: 09-05-2016
 
 '
 
@@ -23,7 +23,7 @@ library(corrplot)
 library(arules)
 library(cluster)
 library(fpc)
-
+library(arulesViz)
 
 # setting the working directory and loading data
 setwd("C:/Users/kimde/Documents/GitHub")
@@ -51,7 +51,7 @@ categories_tweets <- droplevels(subset(tweets, Information.Type != "Not applicab
 # useful_tweets contains only the relevant tweets
 useful_tweets <- droplevels(subset(categories_tweets, Useful.information == 1))
 
-# duplicate_tweets contains only (all) duplicate tweets
+# duplicate_tweets contains only duplicate tweets
 duplicate_tweets <- droplevels(subset(categories_tweets, Duplicate == TRUE))
 
 # checking the levels of this new dataset
@@ -67,6 +67,7 @@ attach(useful_tweets)
 attach(duplicate_tweets)
 detach(useful_tweets)
 detach(categories_tweets)
+detach(duplicate_tweets)
 
 ###################################################################################
 
@@ -80,7 +81,7 @@ information_type_per_disaster <- data.frame(table(disaster, Information.Type, dn
 
 # converting to relative frequencies
 rel_info <- ddply(information_type_per_disaster, "disaster", transform, relative_frequency = Freq / sum(Freq) * 100)
-rel_info$relative_frequency <-round(rel_info$relative_frequency, digits=0)
+rel_info$relative_frequency <-round(rel_info$relative_frequency, digits=5)
 
 # we want to order by "Affected Individuals"
 # this bit is rather complicated - the basic logic is as follows: first only the affected-individuals frequencies are selected, then they are sorted, then this sorted order is applied to the whole dataset
@@ -92,6 +93,8 @@ sorted_rel_info <- rel_info
 total_vector <- vector_ordered_inftype[sort(order(vector_ordered_inftype)[sorted_rel_info$disaster])]
 rel_info$disaster<- reorder.factor(rel_info$disaster, new.order=total_vector)
 rel_info <- arrange(rel_info, disaster)
+
+# creating the plot
 
 cbPalette<-brewer.pal(7, "Greys")[2:7]
 
@@ -152,8 +155,7 @@ rel_info <- arrange(rel_info, disaster)
 # making the graph
 cbPalette<-brewer.pal(3, "Greys")[2:3]
 
-ggplot(rel_info, aes(x=disaster, y=relative_frequency, fill=useful.information)) + geom_bar(stat="identity") + coord_flip() + labs(x = "Disaster", y = "Frequency in percentages", fill= "") + scale_fill_manual(labels=c("Not useful", "Useful"), values = cbPalette) 
-
+ggplot(rel_info, aes(x=disaster, y=relative_frequency, fill=useful.information)) + geom_bar(stat="identity") + coord_flip() + labs(x = "Disaster", y = "Frequency in percentages", fill= "") + scale_fill_manual(labels=c("Not related", "Related"), values = cbPalette) 
 
 
 ###################################################################################
@@ -166,9 +168,6 @@ duplicates_per_disaster <- data.frame(table(disaster, Duplicate, dnn=c("disaster
 
 # converting to relative frequencies
 rel_info <- ddply(duplicates_per_disaster, "disaster", transform, relative_frequency = Freq / sum(Freq) * 100)
-
-save<-subset(rel_info, duplicate==TRUE)
-mean(save$relative_frequency)
 
 # we want to order by "Relevance"
 # this bit is rather complicated - the basic logic is as follows: first only the affected-individuals frequencies are selected, then they are sorted, then this sorted order is applied to the whole dataset
@@ -192,7 +191,7 @@ ggplot(rel_info, aes(x=disaster, y=relative_frequency, fill=duplicate)) + geom_b
 
 # 5. Creating a stacked bar chart for location vs. non-location
 
-# this is ugly but I couldn't figure it out
+# this is ugly but I couldn't figure it out 
 locations_per_disaster <- data.frame(table(disaster, Location, dnn=c("disaster", "location") ))
 locations_per_disaster <-droplevels(subset(locations_per_disaster, disaster != "2013 Sardinia floods"))
 locations_per_disaster <-droplevels(subset(locations_per_disaster, disaster != "2012 Italy earthquakes"))
@@ -229,7 +228,7 @@ ggplot(rel_info, aes(x=disaster, y=relative_frequency, fill=location)) + geom_ba
 # ... for including all tweets
 #information_type_per_author <- data.frame(table(categories_tweets$Information.Source, categories_tweets$Information.Type, dnn=c("source", "information type") )[,]) / nrow(categories_tweets) * 100
 
-# ... for including all(!) duplicate tweets
+# ... for including all duplicate tweets
 information_type_per_author <- data.frame(table(duplicate_tweets$Information.Source, duplicate_tweets$Information.Type, dnn=c("source", "information type") )[,]) / nrow(duplicate_tweets) * 100
 
 # ... for including only useful tweets
@@ -242,6 +241,7 @@ rownames(information_type_per_author) <- c("Eyewitness", "Government", "Media", 
 colnames(information_type_per_author) <- c("Affected Individuals", "Caution and Advice", "Donations", "Infrastructure", "Other useful", "Sympathy")
 
 # picking a color palette
+
 col1<-colorRampPalette(brewer.pal(9, "Greys"))
 
 # making the plot
@@ -265,7 +265,7 @@ corrplot(information_type_per_author,
 
 # 7. Creating a time-plot (for disasters where time data is available)
 
-#todo 
+# TODO 
 
 ###################################################################################
 
@@ -295,6 +295,9 @@ rules.pruned <- rules.sorted[!redundant]
 
 # this is the final set of rules
 inspect(rules.pruned)
+
+# attempt at visualization - not very successful
+plot(rules.pruned, method="grouped")
 
 ###################################################################################
 
@@ -368,4 +371,7 @@ save <-droplevels(subset(save, disaster != "2012 Costa Rica earthquake"))
 
 mean(save$relative_frequency)
 
-detach(categories_tweets)
+# average information sources
+avinfsrc <- droplevels(subset(rel_info, information.source=="OTH"))
+mean(avinfsrc$relative_frequency)
+
